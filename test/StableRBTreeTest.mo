@@ -3,6 +3,7 @@ import Nat "mo:base/Nat";
 import I "mo:base/Iter";
 import List "mo:base/List";
 import RBT "../src/StableRBTree";
+import Text "mo:base/Text";
 
 let sorted =
   [
@@ -60,3 +61,25 @@ assert RBT.size(RBT.share(t)) == 9;
 t := RBT.delete<Nat, Text>(t, Nat.compare, 5);
 
 assert RBT.size(RBT.share(t)) == 8;
+
+// Test equals
+var t1 = RBT.init<Nat, Text>();
+var t2 = RBT.init<Nat, Text>();
+assert RBT.equals<Nat, Text>(t1, t2, Nat.equal, Text.equal);
+
+t1 := RBT.put<Nat, Text>(t1, Nat.compare, 5, "hello");
+assert not RBT.equals<Nat, Text>(t1, t2, Nat.equal, Text.equal);
+
+t2 := RBT.put<Nat, Text>(t2, Nat.compare, 5, "hello");
+assert RBT.equals<Nat, Text>(t1, t2, Nat.equal, Text.equal);
+
+for ((num, lab) in unsort.vals()) {
+  Debug.print (Nat.toText num);
+  Debug.print lab;
+  t1 := RBT.put<Nat, Text>(t1, Nat.compare, num, lab);
+  t2 := RBT.put<Nat, Text>(t2, Nat.compare, num, lab);
+};
+assert RBT.equals<Nat, Text>(t1, t2, Nat.equal, Text.equal);
+
+t2 := RBT.put<Nat, Text>(t2, Nat.compare, 1, "reformer*s*");
+assert not RBT.equals<Nat, Text>(t1, t2, Nat.equal, Text.equal);

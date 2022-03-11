@@ -215,4 +215,27 @@ module {
     }
   };
 
+  func nullValueEquals<V>(valueEquals: (V, V) -> Bool, v1: ?V, v2: ?V): Bool {
+    switch (v1, v2) {
+      case (null, null) { true };
+      case (?v1, ?v2) { valueEquals(v1, v2) };
+      case _ { false }
+    }
+  };
+
+  /// Returns a boolean value indicating if two Red-Black Trees are equivalent as per the keyEquals and valueEquals methods supplied
+  public func equals<K, V>(t1: Tree<K, V>, t2: Tree<K, V>, keyEquals: (K, K) -> Bool, valueEquals: (V, V) -> Bool): Bool {
+    switch(t1, t2) {
+      case (#leaf, #leaf) { true };
+      case (#node(c1, l1, (k1, ?v1), r1), #node(c2, l2, (k2, ?v2), r2)) {
+        if (keyEquals(k1, k2) and nullValueEquals<V>(valueEquals, ?v1, ?v2)) {
+          equals(l1, l2, keyEquals, valueEquals) and equals(r1, r2, keyEquals, valueEquals);
+        } else {
+          false
+        }
+      };
+      case _ { false };
+    }
+  }
+
 }
