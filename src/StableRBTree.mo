@@ -223,19 +223,81 @@ module {
     }
   };
 
-  /// Returns a boolean value indicating if two Red-Black Trees are equivalent as per the keyEquals and valueEquals methods supplied
-  public func equal<K, V>(t1: Tree<K, V>, t2: Tree<K, V>, keyEquals: (K, K) -> Bool, valueEquals: (V, V) -> Bool): Bool {
+  
+  /// For most purposes, one should prefer this equalIgnoreDeleted function as opposed to equalIncludeDeleted.
+  ///
+  /// Functional Red-Black trees do not have efficient operations for deleting a red black tree. For reference, see 
+  /// https://matt.might.net/papers/germane2014deletion.pdf.
+  ///
+  /// Therefore, "deleting" a node is represented as setting the value to null for a specific key.
+  ///
+  /// The equalIgnoreDeleted function returns a boolean value indicating if two Red-Black Trees are equivalent, ignoring node coloring
+  /// and focusing solely on node location and key value equality as per the keyEquals and valueEquals methods supplied.
+  ///
+  /// Note the difference betweenn equalIgnoreDeleted and equalIncludeDeleted in the result of the last line in the following example.
+  ///
+  /// Example:
+  ///
+  /// ```motoko
+  /// var t1 = RBT.init<Nat, Text>();
+  /// var t2 = RBT.init<Nat, Text>();
+  /// t1 := RBT.put<Nat, Text>(t1, Nat.compare, 35, "john");
+  /// t2 := RBT.put<Nat, Text>(t1, Nat.compare, 35, "john");
+  /// RBT.equalIgnoreDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal); // true
+  /// RBT.equalIncludeDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal); // true
+  ///
+  /// t1 := RBT.put<Nat, Text>(t1, Nat.compare, 31, "alice");
+  /// t1 := RBT.delete<Nat, Text>(t1, Nat.compare, 31);
+  /// RBT.equalIgnoreDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal); // true
+  /// RBT.equalIncludeDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal); // false 
+  /// ```
+  public func equalIgnoreDeleted<K, V>(t1: Tree<K, V>, t2: Tree<K, V>, keyEquals: (K, K) -> Bool, valueEquals: (V, V) -> Bool): Bool {
+    let e1 = entries(t1);
+    let e2 = entries(t2);
+    return loop {
+      switch(e1.next(), e2.next()) {
+        case (null, null) { return true };
+        case (?(k1, v1), ?(k2, v2)) {
+          if ( not( 
+            keyEquals(k1, k2) and optionValueEquals<V>(valueEquals, ?v1, ?v2)
+          )) { return false }
+        };
+        case _ { return false }
+      }
+    }
+  };
+
+  /// Functional Red-Black trees do not have efficient operations for deleting a red black tree. Therefore, "deleting" a node is
+  /// represented as setting the value to null for a specific key.
+  ///
+  /// Returns a boolean value indicating if two Red-Black Trees are equivalent, including node coloring and deleted "null" nodes,
+  /// as well as node location and key value equality as per the keyEquals and valueEquals methods supplied
+  ///
+  /// Example:
+  ///
+  /// ```motoko
+  /// var t1 = RBT.init<Nat, Text>();
+  /// var t2 = RBT.init<Nat, Text>();
+  /// t1 := RBT.put<Nat, Text>(t1, Nat.compare, 35, "john");
+  /// t2 := RBT.put<Nat, Text>(t1, Nat.compare, 35, "john");
+  /// RBT.equalIncludeDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal); // true
+  ///
+  /// t1 := RBT.put<Nat, Text>(t1, Nat.compare, 31, "alice");
+  /// t1 := RBT.delete<Nat, Text>(t1, Nat.compare, 31);
+  /// RBT.equalIncludeDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal); // false 
+  /// ```
+  ///
+  public func equalIncludeDeleted<K, V>(t1: Tree<K, V>, t2: Tree<K, V>, keyEquals: (K, K) -> Bool, valueEquals: (V, V) -> Bool): Bool {
     switch(t1, t2) {
       case (#leaf, #leaf) { true };
       case (#node(c1, l1, (k1, ?v1), r1), #node(c2, l2, (k2, ?v2), r2)) {
         if (keyEquals(k1, k2) and optionValueEquals<V>(valueEquals, ?v1, ?v2)) {
-          equal(l1, l2, keyEquals, valueEquals) and equal(r1, r2, keyEquals, valueEquals);
+          equalIncludeDeleted(l1, l2, keyEquals, valueEquals) and equalIncludeDeleted(r1, r2, keyEquals, valueEquals);
         } else {
           false
         }
       };
       case _ { false };
     }
-  }
-
+  };
 }
