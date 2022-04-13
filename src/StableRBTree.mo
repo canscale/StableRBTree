@@ -63,6 +63,107 @@ module {
     removeRec(k, compareTo, tree);
   };
 
+  /// Splits a Red-Black Tree (t) into two Red-Black Trees (t1, t2). All of the nodes' keys in the first Red-Black Tree 
+  /// returned will be less than the nodes' keys in the second Red-Black Tree returned.
+  ///
+  /// Note: this implementation mutates the tree passed in as it re-inserts the root node key values into the left child
+  ///
+  /// Implementation: Splits a Red-Black tree into it's left child and right child trees, then
+  /// inserts the root node into the tree of the left child. Returns the right child Red-Black Tree,
+  /// and the result of reinserting the root node into the left child Red-Black Tree. Transforms the roots
+  /// of both trees it returns to black to protect the tree's invariants
+  ///
+  /// Edge cases
+  /// 1. If the root is a #leaf (empty), returns two #leaf (empty) Red-Black Trees
+  /// 2. If the tree contains a single #node at the root (both children are leaves, returns that node and a #leaf 
+  /// 3. If the tree contains a #node at the root and one child is a #leaf returns the a new tree with the root key and 
+  /// node's key and value, and the child which is a #node 
+  /// 4. If the root node was deleted (with a null value), just returns the left and right child Red-Black Trees. For an
+  /// explanation of how functional Red-Black Trees handle deletion, see https://matt.might.net/papers/germane2014deletion.pdf
+  /// 5. If an invalid Red-Black Tree in terms of being unbalanced is passed to this function, the split will return null.
+  /// This is done instead of splitting the tree, in order to prevent a loss of data in the Red-Black Tree 
+  public func split<K, V>(tree: Tree<K, V>, compareTo: (K, K) -> O.Order): ?(Tree<K, V>, Tree<K, V>) {
+    switch(tree) {
+      // root is leaf -> return two empty Red-Black Trees
+      case (#leaf) { ?(#leaf, #leaf) };
+      // only single node in the Red-Black Tree at the root -> return that node and a leaf
+      case (#node(_, #leaf, kvs, #leaf)) { 
+        switch(kvs) {
+          // root node was deleted -> return two leaf nodes
+          case (k, null) { ?(#leaf, #leaf) };
+          // root node was not deleted -> return that node and a leaf
+          case (k, ?v) { ?(tree, #leaf) }
+        };
+      };
+      // right child is a #node, but left child is a #leaf -> return right child and new tree with root node's key and value
+      // Note: If the tree is invalid and the right child contains any #node children (unbalanced) the result of split will also be unbalanced
+      case (#node(_, #leaf, kvs, #node(_, #leaf, (rk, rv), #leaf))) { 
+        switch(kvs) {
+          // root node was deleted -> return the right child and a leaf
+          case (k, null) {
+            ?(#node(#B, #leaf, (rk, rv), #leaf), #leaf)
+          };
+          // root node was not deleted -> return right child and new tree with root node's key and value
+          case (k, ?v) {
+            ?(
+              #node(#B, #leaf, (k, ?v), #leaf), 
+              #node(#B, #leaf, (rk, rv), #leaf), 
+            )
+          }
+        }
+      };
+      // left child is a #node, but right child is a #leaf -> return left child and new tree with root node's key and value
+      // In this case, to preserve ordering of the returned trees put the new left child tree first and the new tree with root key and value second
+      // Note: If the tree is invalid and the left child contains any #node children (unbalanced) the result of split will also be unbalanced
+      case (#node(_, #node(_, #leaf, (lk, lv), #leaf), kvs, #leaf)) { 
+        switch(kvs) {
+          // root node was deleted -> return the left child and a leaf
+          case (k, null) {
+            ?(#node(#B, #leaf, (lk, lv), #leaf), #leaf)
+          };
+          // root node was not deleted -> return left child and new tree with root node's key and value
+          case (k, ?v) {
+            ?(
+              #node(#B, #leaf, (lk, lv), #leaf), 
+              #node(#B, #leaf, (k, ?v), #leaf), 
+            )
+          }
+        }
+      };
+      // node has both left and right #node children
+      case (#node(
+        _,
+        #node(_, ll, (lk, lv), lr),
+        kvs,
+        #node(_, rl, (rk, rv), rr)
+      )) {
+        switch(kvs) {
+          // root node was deleted -> ignore root reinsertion and just return left and right children
+          case (k, null) {
+            ?(
+              #node(#B, ll, (lk, lv), lr),
+              #node(#B, rl, (rk, rv), rr)
+            )
+          };
+          // root node was not deleted -> return left child with the the root key and value inserted, and the right child
+          case (k, ?v) {
+            ?(
+              put<K, V>(#node(#B, ll, (lk, lv), lr), compareTo, k, v),
+              #node(#B, rl, (rk, rv), rr)
+            )
+          }
+        }
+      };
+      // traps on the following cases, which should never happen, as this would invalidate the variants of the Red-Black Tree to begin with
+      // and would indicate an unbalanced Red-Black Tree
+      // unbalanced on the right side of the tree: case (#node(_, #leaf, (k, v), #node(_, #node(...), (rk, rv), #node(...)))) { 
+      // unbalanced on the left side of the tree:  case (#node(_, #node(_, #node(...), (lk, lv), #node(...)), (k, v), #leaf)) { 
+      case _ {
+        Debug.trap("split() was passed an invalid and unbalanced Red-Black Tree")
+      }
+    }
+  };
+
   /// An iterator for the key-value entries of the map, in ascending key order.
   ///
   /// iterator is persistent, like the tree itself

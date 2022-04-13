@@ -4,6 +4,7 @@ import I "mo:base/Iter";
 import List "mo:base/List";
 import RBT "../src/StableRBTree";
 import Text "mo:base/Text";
+import Option "mo:base/Option";
 
 let sorted =
   [
@@ -102,3 +103,171 @@ t1 := RBT.put<Nat, Text>(t1, Nat.compare, 31, "alice");
 t1 := RBT.delete<Nat, Text>(t1, Nat.compare, 31);
 assert RBT.equalIgnoreDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal);
 assert not RBT.equalIncludeDeleted<Nat, Text>(t1, t2, Nat.equal, Text.equal);
+
+// Test split
+var result = RBT.split<Nat, Text>(#leaf, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    assert RBT.size(l) == 0;
+    assert RBT.size(r) == 0;
+  }
+};
+// test single node at root
+var rootT = RBT.init<Nat, Text>();
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 10, "a");
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    assert RBT.size(l) == 1;
+    assert RBT.size(r) == 0;
+    let lVal = Option.get(RBT.get<Nat, Text>(l, Nat.compare, 10), "null");
+    assert lVal == "a";
+  }
+};
+// test if delete root (now empty tree)
+rootT := RBT.delete<Nat, Text>(rootT, Nat.compare, 10);
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    assert l == #leaf;
+    assert r == #leaf;
+  }
+};
+
+// test root node with left child, but no right child
+rootT := RBT.init<Nat, Text>();
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 10, "a");
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 5, "b");
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    assert RBT.size(l) == 1;
+    assert RBT.size(r) == 1;
+    let lVal = Option.get(RBT.get<Nat, Text>(l, Nat.compare, 5), "null");
+    assert lVal == "b";
+    let rVal = Option.get(RBT.get<Nat, Text>(r, Nat.compare, 10), "null");
+    assert rVal == "a";
+  }
+};
+// delete root, so test with just left child
+rootT := RBT.delete<Nat, Text>(rootT, Nat.compare, 10);
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    // check 10 does not exist in left or right after delete
+    var lVal = Option.get(RBT.get<Nat, Text>(l, Nat.compare, 10), "null");
+    var rVal = Option.get(RBT.get<Nat, Text>(r, Nat.compare, 10), "null");
+    assert lVal == "null";
+    assert rVal == "null";
+    // assert left tree is 5, and right is a leaf
+    assert RBT.size(l) == 1;
+    lVal := Option.get(RBT.get<Nat, Text>(l, Nat.compare, 5), "null");
+    assert lVal == "b";
+    assert r == #leaf;
+  }
+};
+// test root node with right child, but no left child
+rootT := RBT.init<Nat, Text>();
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 10, "a");
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 15, "c");
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    assert RBT.size(l) == 1;
+    assert RBT.size(r) == 1;
+    let lVal = Option.get(RBT.get<Nat, Text>(l, Nat.compare, 10), "null");
+    assert lVal == "a";
+    let rVal = Option.get(RBT.get<Nat, Text>(r, Nat.compare, 15), "null");
+    assert rVal == "c";
+  }
+};
+// delete root, so test with just right child
+rootT := RBT.delete<Nat, Text>(rootT, Nat.compare, 10);
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    // check 10 does not exist in left or right after delete
+    var lVal = Option.get(RBT.get<Nat, Text>(l, Nat.compare, 10), "null");
+    var rVal = Option.get(RBT.get<Nat, Text>(r, Nat.compare, 10), "null");
+    assert lVal == "null";
+    assert rVal == "null";
+    // assert left tree returned is 15, and right is a leaf
+    assert RBT.size(l) == 1;
+    lVal := Option.get(RBT.get<Nat, Text>(l, Nat.compare, 15), "null");
+    assert lVal == "c";
+    assert r == #leaf;
+  }
+};
+// test root with both right and left nodes
+rootT := RBT.init<Nat, Text>();
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 10, "a");
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 5, "b");
+rootT := RBT.put<Nat, Text>(rootT, Nat.compare, 15, "c");
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    // check 10 & 5 are in the left tree and 15 is in the right tree
+    assert RBT.size(l) == 2;
+    assert RBT.size(r) == 1;
+    var lVal = Option.get(RBT.get<Nat, Text>(l, Nat.compare, 10), "null");
+    assert lVal == "a";
+    lVal := Option.get(RBT.get<Nat, Text>(l, Nat.compare, 5), "null");
+    assert lVal == "b";
+    let rVal = Option.get(RBT.get<Nat, Text>(r, Nat.compare, 15), "null");
+    assert rVal == "c";
+    // check that the root of the left tree is 5 (10 was inserted into it)
+    switch(l) {
+      case (#leaf) { assert false };
+      case (#node(_, _, (k, v), _)) {
+        assert k == 5;
+        assert Option.get(v, "null") == "b";
+      }
+    }
+  }
+};
+// delete root, test with left and right child
+rootT := RBT.delete<Nat, Text>(rootT, Nat.compare, 10);
+result := RBT.split<Nat, Text>(rootT, Nat.compare);
+switch(result) {
+  case null { assert false };
+  case (?(l, r)) {
+    // check 10 does not exist in left or right after delete
+    var lVal = Option.get(RBT.get<Nat, Text>(l, Nat.compare, 10), "null");
+    var rVal = Option.get(RBT.get<Nat, Text>(r, Nat.compare, 10), "null");
+    assert lVal == "null";
+    assert rVal == "null";
+    // assert left tree returned is 5, and right is 15
+    assert RBT.size(l) == 1;
+    assert RBT.size(r) == 1;
+    lVal := Option.get(RBT.get<Nat, Text>(l, Nat.compare, 5), "null");
+    assert lVal == "b";
+    rVal := Option.get(RBT.get<Nat, Text>(r, Nat.compare, 15), "null");
+    assert rVal == "c";
+  }
+};
+
+/* Should trap and throw an error if uncommented - leave commented for passing CI
+// If passed an invalid RBTree, will throw an error and trap
+let invalidRBTree = #node(
+  #B,
+  #node(
+    #R, 
+    #leaf, 
+    (5, ?"b"), 
+    #node(#B, #leaf, (10, ?"a"), #leaf)
+  ),
+  (15, ?"c"),
+  #leaf
+);
+result := RBT.split<Nat, Text>(invalidRBTree, Nat.compare);
+*/
+
+
