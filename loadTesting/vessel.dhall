@@ -1,0 +1,1 @@
+{ dependencies = [ "base", "stable-rbtree" ], compiler = Some "0.6.26" }
