@@ -169,10 +169,36 @@ module {
   /// iterator is persistent, like the tree itself
   public func entries<K, V>(tree: Tree<K, V>) : I.Iter<(K, V)> { iter(tree, #fwd) };
 
+    /// An `Iter` over the keys.
+    ///
+    /// Each iterator gets a _persistent view_ of the mapping, independent of concurrent updates to the iterated map.
+    public func keys<K, V>(tree: Tree<K,V>) : I.Iter<K>
+    { I.map(entries(tree), func (kv : (K, V)) : K { kv.0 }) };
+
+    /// An `Iter` over the values.
+    ///
+    /// Each iterator gets a _persistent view_ of the mapping, independent of concurrent updates to the iterated map.
+    public func vals<K, V>(tree: Tree<K,V>) : I.Iter<V>
+    { I.map(entries(tree), func (kv : (K, V)) : V { kv.1 }) };
+
   /// An iterator for the key-value entries of the map, in descending key order.
   ///
   /// iterator is persistent, like the tree itself
   public func entriesRev<K, V>(tree: Tree<K, V>) : I.Iter<(K, V)> { iter(tree, #bwd) };
+
+
+/// An `Iter` over the keys.
+    ///
+    /// Each iterator gets a _persistent view_ of the mapping, independent of concurrent updates to the iterated map.
+    public func keysRev<K, V>(tree: Tree<K,V>) : I.Iter<K>
+    { I.map(entriesRev(tree), func (kv : (K, V)) : K { kv.0 }) };
+
+    /// An `Iter` over the values.
+    ///
+    /// Each iterator gets a _persistent view_ of the mapping, independent of concurrent updates to the iterated map.
+    public func valsRev<K, V>(tree: Tree<K,V>) : I.Iter<V>
+    { I.map(entriesRev(tree), func (kv : (K, V)) : V { kv.1 }) };
+
 
 
 
