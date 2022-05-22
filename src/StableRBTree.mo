@@ -63,6 +63,12 @@ module {
     removeRec(k, compareTo, tree);
   };
 
+  /// Apply an update function to an entry associated with a given key, or create that entry if it does not yet exist.
+  /// Returns the old value and the new tree
+  public func update<K, V>(tree: Tree<K, V>, compareTo: (K, K) -> O.Order, k: K, updateFunction: (?V) -> V): (?V, Tree<K, V>) {
+    updateRoot(tree, compareTo, k, updateFunction);
+  };
+
   /// Splits a Red-Black Tree (t) into two Red-Black Trees (t1, t2). All of the nodes' keys in the first Red-Black Tree 
   /// returned will be less than the nodes' keys in the second Red-Black Tree returned.
   ///
@@ -209,7 +215,7 @@ module {
     }
   };
 
-  /// Remove the value associated with a given key.
+  /// Recursive helper for removing the value associated with a given key.
   func removeRec<K, V>(k : K, compareTo : (K, K) -> O.Order, t : Tree<K, V>)
     : (?V, Tree<K, V>) {
     switch t {
@@ -232,9 +238,36 @@ module {
     }
   };
 
+  func updateRoot<K, V>(tree: Tree<K, V>, compareTo: (K, K) -> O.Order, k : K, updateFn: (?V) -> V): (?V, Tree<K, V>) {
+    switch (updateRec(tree, compareTo, k, updateFn)) {
+      case (_, #leaf) { assert false; loop { } };
+      case (vo, #node(_, l, kv, r)) { (vo, #node(#B, l, kv, r)) };
+    }
+  };
 
+  // Recursive helper for inserting or updating a value associated with a given key according to the updateFn provided
+  func updateRec<K, V>(tree: Tree<K, V>, compareTo: (K, K) -> O.Order, kToUpdate : K, updateFn: (?V) -> V): (?V, Tree<K, V>) {
+    switch tree {
+      case (#leaf) { (null, #node(#R, #leaf, (kToUpdate, ?updateFn(null)), #leaf)) };
+      case (#node(c, l, (k, v), r)) {
+        switch (compareTo(kToUpdate, k)) {
+          case (#less) {
+            let (vo, l2) = updateRec(l, compareTo, kToUpdate, updateFn);
+            (vo, bal<K, V>(c, l2, (k, v), r))
+          };
+          case (#equal) {
+            (v, #node(c, l, (k, ?updateFn(v)), r))
+          };
+          case (#greater) {
+            let (vo, r2) = updateRec(r, compareTo, kToUpdate, updateFn);
+            (vo, bal<K, V>(c, l, (k, v), r2))
+          };
+        }
+      }
+    }
+  };
 
-  func bal<K, V>(color : Color, lt : Tree<K, V>, kv : (K, ?V), rt : Tree<K, V>) : Tree<K, V> {
+  public func bal<K, V>(color : Color, lt : Tree<K, V>, kv : (K, ?V), rt : Tree<K, V>) : Tree<K, V> {
     // thank you, algebraic pattern matching!
     // following notes from [Ravi Chugh](https://www.classes.cs.uchicago.edu/archive/2019/spring/22300-1/lectures/RedBlackTrees/index.html)
     switch (color, lt, kv, rt) {

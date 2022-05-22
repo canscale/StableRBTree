@@ -6,6 +6,10 @@ import RBT "../src/StableRBTree";
 import Text "mo:base/Text";
 import Option "mo:base/Option";
 
+import M "mo:matchers/Matchers";
+import S "mo:matchers/Suite";
+import T "mo:matchers/Testable";
+
 let sorted =
   [
     (1, "reformer"),
@@ -271,3 +275,90 @@ result := RBT.split<Nat, Text>(invalidRBTree, Nat.compare);
 */
 
 
+let { run;test;suite; } = S;
+
+func incrementFunc(v: ?Nat): Nat {
+  switch(v) {
+    case null { 1 };
+    case (?v) { v + 1 };
+  }
+};
+
+func testableUpdateRBTreeResult<K, V>(
+  res: (?V, RBT.Tree<K, V>),
+  keyEquals: (K, K) -> Bool,
+  valueEquals: (V, V) -> Bool,
+): T.TestableItem<(?V, RBT.Tree<K, V>)> = {
+  display = func((ov: ?V, t: RBT.Tree<K, V>)): Text { "placeholder" }; // { "ov=" # debug_show(ov) # ", tree=" # debug_show(t) };
+  equals = func(
+    (ov1: ?V, t1: RBT.Tree<K, V>),
+    (ov2: ?V, t2: RBT.Tree<K, V>)
+  ): Bool {
+    switch(ov1, ov2) {
+      case (null, null) { RBT.equalIgnoreDeleted<K, V>(t1, t2, keyEquals, valueEquals) };
+      case (?ov1, ?ov2) {
+        valueEquals(ov1, ov2) and RBT.equalIgnoreDeleted<K, V>(t1, t2, keyEquals, valueEquals)
+      };
+      case _ { false }
+    }
+  };
+  item = res;
+};
+
+let updateSuite = suite("update",
+  [
+    test("applies the increment function correctly to create the expected value (1) for the key if the tree is empty, returning null and the new tree",
+      RBT.update<Text, Nat>(RBT.init<Text, Nat>(), Text.compare, "apples", incrementFunc),
+      M.equals(
+        testableUpdateRBTreeResult<Text, Nat>(
+          (null, RBT.put<Text, Nat>(RBT.init<Text, Nat>(), Text.compare, "apples", 1)), 
+          Text.equal, 
+          Nat.equal
+        )
+      )
+    ),
+    test("applies the increment function correctly to create the expected value (1) for the key if the tree is not empty but does not contain the key, returning null and the new tree",
+      do {
+        let tree = RBT.put<Text, Nat>(RBT.init<Text, Nat>(), Text.compare, "oranges", 5);
+        RBT.update<Text, Nat>(tree, Text.compare, "apples", incrementFunc);
+      },
+      M.equals(
+        testableUpdateRBTreeResult<Text, Nat>(
+          (null, 
+            do {
+              let expected = RBT.put<Text, Nat>(RBT.init<Text, Nat>(), Text.compare, "oranges", 5);
+              RBT.put<Text, Nat>(expected, Text.compare, "apples", 1)
+            }
+          ), 
+          Text.equal, 
+          Nat.equal
+        )
+      )
+    ),
+    test("applies the increment function correctly to create the expected value (4) for the key if the tree contains the key, returning the original value and the new tree",
+      do {
+        var tree = RBT.put<Text, Nat>(RBT.init<Text, Nat>(), Text.compare, "oranges", 5);
+        tree := RBT.put<Text, Nat>(tree, Text.compare, "apples", 9);
+        RBT.update<Text, Nat>(tree, Text.compare, "apples", incrementFunc);
+      },
+      M.equals(
+        testableUpdateRBTreeResult<Text, Nat>(
+          (?9, 
+            do {
+              let expected = RBT.put<Text, Nat>(RBT.init<Text, Nat>(), Text.compare, "oranges", 5);
+              RBT.put<Text, Nat>(expected, Text.compare, "apples", 10)
+            }
+          ), 
+          Text.equal, 
+          Nat.equal
+        )
+      )
+    )
+  ],
+);
+
+run(suite("StableRBTree", 
+  [
+    updateSuite
+  ]
+));
