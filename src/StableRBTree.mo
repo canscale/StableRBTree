@@ -5,6 +5,9 @@ import I "mo:base/Iter";
 import List "mo:base/List";
 import Nat "mo:base/Nat";
 import O "mo:base/Order";
+import Buffer "mo:base/Buffer";
+import Stack "mo:base/Stack";
+import Option "mo:base/Option";
 
 module {
 
@@ -180,12 +183,13 @@ module {
   /// iterator is persistent, like the tree itself
   public func entriesRev<K, V>(tree: Tree<K, V>) : I.Iter<(K, V)> { iter(tree, #bwd) };
 
-
-
   type IterRep<K, V> = List.List<{ #tr:Tree<K, V>; #kv:(K, ?V) }>;
 
+  /// Direction of iteration (forwards or backwards)
+  public type Direction = { #fwd; #bwd };
+
   /// An iterator for the entries of the map, in ascending (`#fwd`) or descending (`#bwd`) order.
-  public func iter<K, V>(t : Tree<K, V>, dir : { #fwd; #bwd }) : I.Iter<(K, V)> {
+  public func iter<K, V>(t : Tree<K, V>, dir : Direction) : I.Iter<(K, V)> {
     object {
       var trees : IterRep<K, V> = ?(#tr(t), null);
       public func next() : ?(K, V) {
@@ -213,6 +217,142 @@ module {
         }
       };
     }
+  };
+
+  public type ScanLimitResult<K, V> = {
+    results: [(K, V)];
+    nextKey: ?K;
+  };
+
+  /// Performs a in-order scan of the Red-Black Tree between the provided key bounds, returning a number of matching entries in the direction specified (forwards/backwards) limited by the limit parameter specified in an array formatted as (K, V) for each entry
+  public func scanLimit<K, V>(t: Tree<K, V>, compareTo: (K, K) -> O.Order, lowerBound: K, upperBound: K, dir: Direction, limit: Nat): ScanLimitResult<K, V> {
+    switch(compareTo(lowerBound, upperBound)) {
+      // return empty array if lower bound is greater than upper bound      
+      // TODO: consider returning an error in this case?
+      case (#greater) {{ results = []; nextKey = null }};
+      // return the single entry if exists if the lower and upper bounds are equivalent
+      case (#equal) { 
+        switch(get<K, V>(t, compareTo, lowerBound)) {
+          case null {{ results = []; nextKey = null }};
+          case (?value) {{ results = [(lowerBound, value)]; nextKey = null }};
+        }
+      };
+      case (#less) { 
+        let (results, nextKey) = iterScanLimit<K, V>(t, compareTo, lowerBound, upperBound, dir, limit);
+        { results = results; nextKey = nextKey };
+      }
+    }
+  };
+
+  type RBTreeNode<K, V> = { #node: (Color, Tree<K, V>, (K, ?V), Tree<K, V>) };
+
+  func iterScanLimit<K, V>(t: Tree<K, V>, compareTo: (K, K) -> O.Order, lowerBound: K, upperBound: K, dir: Direction, limit: Nat): ([(K, V)], ?K) {
+    var remaining = limit + 1;
+    let resultBuffer: Buffer.Buffer<(K, V)> = Buffer.Buffer(0);
+    var nextKey: ?K = null;
+    var nodeStack = Stack.Stack<RBTreeNode<K, V>>();
+    var currentNode = t;
+
+    while (remaining > 0) {
+      // this loop finds the next non-deleted node in order, adds it to the stack if that node exists, and then exits the loop 
+      // otherwise a leaf is hit and the loop is exited 
+      label l loop {
+        switch(currentNode) {
+          case (#node(c, l, (k, v), r)) {
+            // compare the node key to see if it is within the key bounds, if so, add it to the nodeStack
+            switch(dir, compareTo(k, lowerBound), compareTo(k, upperBound)) {
+              // value is greater than lower and upper bounds, traverse left child regardless of direction order
+              case (_, #greater, #greater) {
+                currentNode := l;
+              };
+              // if ascending order and value is greater than lower and equal to upper, push node to stack and go left
+              case (#fwd, #greater, #equal) {
+                nodeStack.push(#node(c, l, (k, v), r));
+                currentNode := l 
+              };
+              // if descending order and value is greater than lower and equal to upper
+              case (#bwd, #greater, #equal) {
+                // if value is not null, push to stack and break as can not go any farther to the right 
+                if (Option.isSome(v)) {
+                  nodeStack.push(#node(c, l, (k, v), r));
+                  break l;
+                // otherwise go left, as the current node was deleted and can still go to the left 
+                } else {
+                  currentNode := l;
+                }
+              };
+              // value is greater than lower and less than upper, push node to stack, then traverse left or right child depending on direction order
+              case (#fwd, #greater, #less) {
+                nodeStack.push(#node(c, l, (k, v), r));
+                currentNode := l; 
+              };
+              case (#bwd, #greater, #less) {
+                nodeStack.push(#node(c, l, (k, v), r));
+                currentNode := r;
+              };
+              // if ascending order and value is equal to lower and less than upper
+              case (#fwd, #equal, #less) {
+                // if value is not null, push to stack and break as can not go any farther to the left 
+                if (Option.isSome(v)) {
+                  nodeStack.push(#node(c, l, (k, v), r));
+                  break l;
+                // otherwise go right, as the current node was deleted and can still go to the right
+                } else {
+                  currentNode := r;
+                }
+              };
+              // if descending order and value is equal to lower and less than upper
+              case (#bwd, #equal, #less) {
+                nodeStack.push(#node(c, l, (k, v), r));
+                currentNode := r;
+              };
+              // if value is less than lower and upper bounds, traverse right child regardless of direction order
+              case (_, #less, #less) {
+                currentNode := r;
+              };
+              // This should never be hit as the cases where lower bound >= upper bound are covered in the main scan function
+              case _ { 
+                break l;
+              };
+            }
+          };
+          // have already hit the next node in order, exit the loop
+          case (#leaf) { 
+            break l;
+          };
+        }
+      };
+
+      // pop the next node from the stack
+      switch(nodeStack.pop()) {
+        // if the stack is empty, no more nodes within the bounds exist, so can return
+        case null { 
+          return (resultBuffer.toArray(), nextKey);
+        };
+        case (?(#node(_, l, (k, v), r))) {
+          switch(v) {
+            // if the popped node's value is null (was deleted), skip it and traverse to the right child
+            case null {};
+            // if the popped node's value is present, prepend it to the entries list and traverse to the right child
+            case (?value) {
+              if (remaining == 1) {
+                nextKey := ?k;
+              } else {
+                resultBuffer.add((k, value));
+              };
+              remaining -= 1;
+            }
+          };
+          // traverse to the left or right child depending on the direction order
+          currentNode := switch(dir) {
+            case (#fwd) { r };
+            case (#bwd) { l };
+          };
+        }
+      }
+    };
+
+    return (resultBuffer.toArray(), nextKey);
   };
 
   /// Recursive helper for removing the value associated with a given key.
