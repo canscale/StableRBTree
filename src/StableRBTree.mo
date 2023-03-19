@@ -327,7 +327,7 @@ module {
       switch(nodeStack.pop()) {
         // if the stack is empty, no more nodes within the bounds exist, so can return
         case null { 
-          return (resultBuffer.toArray(), nextKey);
+          return (Buffer.toArray(resultBuffer), nextKey);
         };
         case (?(#node(_, l, (k, v), r))) {
           switch(v) {
@@ -352,7 +352,7 @@ module {
       }
     };
 
-    return (resultBuffer.toArray(), nextKey);
+    return (Buffer.toArray(resultBuffer), nextKey);
   };
 
   /// Recursive helper for removing the value associated with a given key.
