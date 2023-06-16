@@ -1016,6 +1016,67 @@ let scanLimitInReverseSuite = suite("scanLimit in the #bwd direction",
         nextKey = ?"o";
       }, Text.equal, Nat.equal))
     ),
+    test("if the scan limit filter the results but not the upper bound nor the limit is reached, returns the expected result and the appropriate nextKey",
+      RBT.scanLimitWithFilter<Text, Nat>(
+        createTextNatRBTreeWithKeys(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]),
+        Text.compare,
+        "c",
+        "z",
+        #fwd,
+        24,
+        func(k: Text, v: Nat) : Bool { Text.less(k, "f") or Text.greater(k, "w"); }
+      ),
+      M.equals(testableRBTreeScanLimitResult<Text, Nat>({
+        results = [
+          ("c", 5),
+          ("d", 5),
+          ("e", 5),
+          ("x", 5),
+          ("y", 5),
+          ("z", 5),
+        ];
+        nextKey = null;
+      }, Text.equal, Nat.equal))
+    ),
+    test("if the scan limit filter the results and the limit is reached, returns the expected result and the appropriate nextKey",
+      RBT.scanLimitWithFilter<Text, Nat>(
+        createTextNatRBTreeWithKeys(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]),
+        Text.compare,
+        "c",
+        "z",
+        #fwd,
+        3,
+        func(k: Text, v: Nat) : Bool { Text.less(k, "f") or Text.greater(k, "w"); }
+      ),
+      M.equals(testableRBTreeScanLimitResult<Text, Nat>({
+        results = [
+          ("c", 5),
+          ("d", 5),
+          ("e", 5),
+        ];
+        nextKey = ?"x";
+      }, Text.equal, Nat.equal))
+    ),
+    test("if the scan limit filter the results and the upper bound is reached, returns the expected result and the appropriate nextKey",
+      RBT.scanLimitWithFilter<Text, Nat>(
+        createTextNatRBTreeWithKeys(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]),
+        Text.compare,
+        "c",
+        "x",
+        #fwd,
+        24,
+        func(k: Text, v: Nat) : Bool { Text.less(k, "f") or Text.greater(k, "w"); }
+      ),
+      M.equals(testableRBTreeScanLimitResult<Text, Nat>({
+        results = [
+          ("c", 5),
+          ("d", 5),
+          ("e", 5),
+          ("x", 5),
+        ];
+        nextKey = null;
+      }, Text.equal, Nat.equal))
+    ),
   ]
 );
 
