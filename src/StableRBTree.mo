@@ -20,6 +20,9 @@ module {
     #leaf;
   };
 
+  /// Predicate to filter scan limit results.
+  public type Predicate<K, V> = (K, V) -> Bool;
+
   /// Initializes an empty Red-Black Tree of type <K, V>
   /// Returns this empty Red-Black Tree
   public func init<K, V>(): Tree<K, V> {
@@ -226,6 +229,11 @@ module {
 
   /// Performs a in-order scan of the Red-Black Tree between the provided key bounds, returning a number of matching entries in the direction specified (forwards/backwards) limited by the limit parameter specified in an array formatted as (K, V) for each entry
   public func scanLimit<K, V>(t: Tree<K, V>, compareTo: (K, K) -> O.Order, lowerBound: K, upperBound: K, dir: Direction, limit: Nat): ScanLimitResult<K, V> {
+    scanLimitWithFilter(t, compareTo, lowerBound, upperBound, dir, limit, func(k: K, v: V) : Bool = true);
+  };
+
+  /// Performs a in-order scan of the Red-Black Tree between the provided key bounds, returning a number of matching entries in the direction specified (forwards/backwards) limited by the limit parameter specified in an array formatted as (K, V) for each entry
+  public func scanLimitWithFilter<K, V>(t: Tree<K, V>, compareTo: (K, K) -> O.Order, lowerBound: K, upperBound: K, dir: Direction, limit: Nat, filter: Predicate<K, V>): ScanLimitResult<K, V> {
     switch(compareTo(lowerBound, upperBound)) {
       // return empty array if lower bound is greater than upper bound      
       // TODO: consider returning an error in this case?
@@ -234,11 +242,17 @@ module {
       case (#equal) { 
         switch(get<K, V>(t, compareTo, lowerBound)) {
           case null {{ results = []; nextKey = null }};
-          case (?value) {{ results = [(lowerBound, value)]; nextKey = null }};
+          case (?value) {
+            if (filter(lowerBound, value)){
+              { results = [(lowerBound, value)]; nextKey = null }
+            } else {
+              { results = []; nextKey = null }
+            };
+          };
         }
       };
       case (#less) { 
-        let (results, nextKey) = iterScanLimit<K, V>(t, compareTo, lowerBound, upperBound, dir, limit);
+        let (results, nextKey) = iterScanLimit<K, V>(t, compareTo, lowerBound, upperBound, dir, limit, ?filter);
         { results = results; nextKey = nextKey };
       }
     }
@@ -246,7 +260,7 @@ module {
 
   type RBTreeNode<K, V> = { #node: (Color, Tree<K, V>, (K, ?V), Tree<K, V>) };
 
-  func iterScanLimit<K, V>(t: Tree<K, V>, compareTo: (K, K) -> O.Order, lowerBound: K, upperBound: K, dir: Direction, limit: Nat): ([(K, V)], ?K) {
+  func iterScanLimit<K, V>(t: Tree<K, V>, compareTo: (K, K) -> O.Order, lowerBound: K, upperBound: K, dir: Direction, limit: Nat, filter: ?Predicate<K, V>): ([(K, V)], ?K) {
     var remaining = limit + 1;
     let resultBuffer: Buffer.Buffer<(K, V)> = Buffer.Buffer(0);
     var nextKey: ?K = null;
@@ -335,12 +349,14 @@ module {
             case null {};
             // if the popped node's value is present, prepend it to the entries list and traverse to the right child
             case (?value) {
-              if (remaining == 1) {
-                nextKey := ?k;
-              } else {
-                resultBuffer.add((k, value));
+              if (Option.getMapped(filter, func(f: Predicate<K, V>) : Bool = f(k, value), true)){
+                if (remaining == 1) {
+                  nextKey := ?k;
+                } else {
+                  resultBuffer.add((k, value));
+                };
+                remaining -= 1;
               };
-              remaining -= 1;
             }
           };
           // traverse to the left or right child depending on the direction order
