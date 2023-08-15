@@ -229,22 +229,7 @@ module {
 
   /// Performs a in-order scan of the Red-Black Tree between the provided key bounds, returning a number of matching entries in the direction specified (forwards/backwards) limited by the limit parameter specified in an array formatted as (K, V) for each entry
   public func scanLimit<K, V>(t: Tree<K, V>, compareTo: (K, K) -> O.Order, lowerBound: K, upperBound: K, dir: Direction, limit: Nat): ScanLimitResult<K, V> {
-    switch(compareTo(lowerBound, upperBound)) {
-      // return empty array if lower bound is greater than upper bound      
-      // TODO: consider returning an error in this case?
-      case (#greater) {{ results = []; nextKey = null }};
-      // return the single entry if exists if the lower and upper bounds are equivalent
-      case (#equal) { 
-        switch(get<K, V>(t, compareTo, lowerBound)) {
-          case null {{ results = []; nextKey = null }};
-          case (?value) {{ results = [(lowerBound, value)]; nextKey = null }};
-        }
-      };
-      case (#less) { 
-        let (results, nextKey) = iterScanLimit<K, V>(t, compareTo, lowerBound, upperBound, dir, limit, null);
-        { results = results; nextKey = nextKey };
-      }
-    }
+    scanLimitWithFilter(t, compareTo, lowerBound, upperBound, dir, limit, func(k: K, v: V) : Bool = true);
   };
 
   /// Performs a in-order scan of the Red-Black Tree between the provided key bounds, returning a number of matching entries in the direction specified (forwards/backwards) limited by the limit parameter specified in an array formatted as (K, V) for each entry
@@ -257,7 +242,13 @@ module {
       case (#equal) { 
         switch(get<K, V>(t, compareTo, lowerBound)) {
           case null {{ results = []; nextKey = null }};
-          case (?value) {{ results = [(lowerBound, value)]; nextKey = null }};
+          case (?value) {
+            if (filter(lowerBound, value)){
+              { results = [(lowerBound, value)]; nextKey = null }
+            } else {
+              { results = []; nextKey = null }
+            };
+          };
         }
       };
       case (#less) { 
@@ -358,7 +349,7 @@ module {
             case null {};
             // if the popped node's value is present, prepend it to the entries list and traverse to the right child
             case (?value) {
-              if (Option.getMapped(filter, func(f: Predicate<K, V>) : Bool { f(k, value); }, true)){
+              if (Option.getMapped(filter, func(f: Predicate<K, V>) : Bool = f(k, value), true)){
                 if (remaining == 1) {
                   nextKey := ?k;
                 } else {

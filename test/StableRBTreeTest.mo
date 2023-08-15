@@ -1077,6 +1077,21 @@ let scanLimitInReverseSuite = suite("scanLimit in the #bwd direction",
         nextKey = null;
       }, Text.equal, Nat.equal))
     ),
+    test("if there is only one result and it is filtered out, returns an empty list and null nextKey",
+      RBT.scanLimitWithFilter<Text, Nat>(
+        createTextNatRBTreeWithKeys(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]),
+        Text.compare,
+        "c",
+        "c",
+        #fwd,
+        24,
+        func(k: Text, v: Nat) : Bool { false; }
+      ),
+      M.equals(testableRBTreeScanLimitResult<Text, Nat>({
+        results = [];
+        nextKey = null;
+      }, Text.equal, Nat.equal))
+    ),
   ]
 );
 
